@@ -65,6 +65,7 @@ while True:
         x_medium = int((x + x + w) / 2)
         break
 
+    cv2.line(frame, (x_medium,0), (x_medium, 480), (0,255,0),2)
     cv2.imshow("Frame", frame)
 
     # move servo left or right to follow object
