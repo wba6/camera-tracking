@@ -61,21 +61,25 @@ def detect_faces_dnn(frame, conf_threshold=0.4):
 # 3. Global Parameters for Tracking and Scanning Modes
 # ------------------------------------------------
 CAMERA_FOV = 95.0         # Horizontal Field of View in degrees for the 2K camera
-MIN_FACE_AREA = 500      # Minimum face area (in pixels) to consider valid
+MIN_FACE_AREA = 500       # Minimum face area (in pixels) to consider valid
 
 # Scanning mode parameters
-scanning_step = 5         # Degrees per iteration when scanning
+scanning_step = 3         # Degrees per iteration when scanning
 scan_direction = 1        # 1 for right, -1 for left
 
 # Maximum servo movement per iteration (degrees)
-MAX_DELTA = 5.0
+MAX_DELTA = 2.0           # Reduced to allow smaller incremental changes
 
 # Deadband (degrees): if error is below this, do not adjust.
-DEADBAND = 20.0
+DEADBAND = 10.0           # Lower deadband helps prevent oscillation
 
 # Smoothing parameters for target angle filtering
-smoothing_weight = 0.3    # Weight for new target; lower values make the change slower.
+smoothing_weight = 0.3    # Weight for new target; lower values slow the change
 smoothed_target_angle = 90  # Initialize with the servo center
+
+# PD Controller gains (tuned conservatively)
+Kp = 20                  # Lower proportional gain
+Kd = 2                   # Lower derivative gain
 
 # ------------------------------------------------
 # 4. Face Tracking Mode
@@ -122,16 +126,10 @@ def face_tracking_mode(frame):
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             return True, frame
 
-        # Adjust the servo: compute a delta and cap it.
-        # Use a smoothing factor based on error magnitude.
-        if abs(diff) > 20:
-            alpha = 0.6
-        elif abs(diff) > 10:
-            alpha = 0.5
-        else:
-            alpha = 0.3
-
-        raw_delta = alpha * diff
+        # Compute a PD-based adjustment.
+        # (Note: For a very basic derivative term, we simply use the current diff.)
+        raw_delta = Kp * diff + Kd * diff
+        # Cap the movement to avoid overshoot.
         delta = max(-MAX_DELTA, min(MAX_DELTA, raw_delta))
         new_angle = current_angle + delta
         new_angle = max(0, min(180, new_angle))
@@ -182,11 +180,12 @@ try:
             cv2.putText(frame, "Scanning...", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
 
-#        cv2.imshow("Face Tracking", frame)
-#        if cv2.waitKey(1) & 0xFF == ord('q'):
-#            break
+        # If you want to view the frame for debugging, uncomment these:
+        # cv2.imshow("Face Tracking", frame)
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     break
 
-        time.sleep(0.05)
+        time.sleep(0.1)  # Increase delay to reduce update frequency
 
 except KeyboardInterrupt:
     print("Exiting program.")
